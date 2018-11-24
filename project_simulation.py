@@ -6,6 +6,7 @@ from math import *
 import sys
 from math import *
 
+
 Vdd = 2.5
 Vss = -2.5
 Imin = 1000
@@ -16,7 +17,16 @@ V_th = 0.5
 uCox = 50e-6
 uCox_p = 25e-6
 outputCurrent, outputVoltages, outputParams, outputPerform = [], [], [], []
-#Itop = 24.6122 * 10 ** -6
+
+# Capacitance constants
+Cgate = 1.3 * 10 ** -15 #fF / um
+# Ratio of parasitic capacitance
+Cdb = .33
+# Assume Csb = Cdb 
+Csb = .33
+Cgd = .25
+Dom_Pole = 10 ** 20
+
 # Sweep pvbias range:
 Vbias_min = -1.9
 Vbias_max = -1.4
@@ -34,7 +44,7 @@ W_L_1L = 40.
 W_L_1bias = 32.
 W_L_1 = 13.
 
-W_L_2L = 1
+W_L_2L = 20.
 W_L_2bias = 32.
 W_L_2 = 13.
 
@@ -48,14 +58,14 @@ while(Vbiasp < Vbiasp_max):
     roL = 1/(lam * IdL)
     while(Vbias < Vbias_max):
         vovB = Vbias - Vss - V_th    
-        IdB = .5 * uCox * W_L_1bias * vovB ** 2
-        vov1 = sqrt(2 * IdB / (W_L_1 * uCox))       
+        IdB1 = .5 * uCox * W_L_1bias * vovB ** 2
+        vov1 = sqrt(2 * IdB1 / (W_L_1 * uCox))       
         roB = 1/(lam * IdL)
         # This equation is a taylor expansion around vov1 = 0
         Vsb = 1.60598 - .837037 * vov1
         Vs1 = Vsb + Vss
         #IdB += Vsb / roB
-        Ires = IdL - IdB
+        Ires = IdL - IdB1
         Vd1 = (Ires + Vdd/RU + Vss/RD)/(1/RU + 1/RD)
         if Vd1 > 2.5 or Vd1 < 0:
             Vbias += Vbias_inc
@@ -64,11 +74,22 @@ while(Vbiasp < Vbiasp_max):
         # Use vovPmos and Itop to determine W of M_L1
         Iu = (Vdd - Vd1)/RU
         Id = (Vd1 - Vss)/RD
-            # Assume Ru-a//Rup//Rdown = Ru-a
+        # Assume Ru-a//Rup//Rdown = Ru-a
         Rtot = roL * RU * RD / (roL * RU + roL * RD + RU * RD)
         A1 = -Rtot
-        
-        # Begin PHASE 2
+        # Bandwidth Calculations for Stage 1
+        Cgs1 = W_L_1 * Cgate
+        Cdb1 = Cgs1 * Cdb
+        Csb1 = Cgs1 * Csb
+        Cgd1 = Cgs1 * Cgd
+
+        Cgs1B = W_L_1bias * Cgate
+        Cdb1B = Cgs1B * Cdb
+        Cgd1B = Cgs1B * Cgd
+        CtotB = Cgs1B + Cdb1B 
+        Ctot = Cgs1 + Csb1 + CtotB
+        print 1/(Ctot * roB * 2 * pi * 10 ** 6)
+        #PHASE 2
         V2G = Vd1
         Id2 = 0.5 * uCox * W_L_2bias * (Vbias - Vss - V_th) ** 2 # Current set by Vbias
         roL2 = 1 / (lam * Id2)
@@ -102,6 +123,13 @@ while(Vbiasp < Vbiasp_max):
         if Vov2 > Vds2: # in saturation
              Vbias += Vbias_inc
              continue
+        # Phase 2 Capacitance Calculations:
+        Cgs1 = W_L_2 * Cgate
+        Cdb1 = Cgs2 * Cdb
+        Csb1 = Cgs2 * Csb
+        Cgd1 = Cgs2 * Cgd    
+
+        # Phase 3
         V3G = Vd2
 
         Id3 = 0.5 * uCox * W_L_3bias * (Vbias - Vss - V_th) ** 2
@@ -133,11 +161,10 @@ while(Vbiasp < Vbiasp_max):
             Amax = Atot
             print "A", Atot, A1, A2, A3
             print "Vbias ", Vbias, "Vbiasp ", Vbiasp
+        # Phase 3 Capacitance Calculations
+        Cgs3 = W_L_3 * Cgate
+        Cds3 = Cgs3 * Cds
+        Cgd3 = Cgs3 * Cgd
+        Cds3 = Cds3 * Cds  
         Vbias += Vbias_inc
     Vbiasp += Vbias_inc
-
-
-
-
-
-
